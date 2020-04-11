@@ -7,13 +7,28 @@ Prerequisites: 4 machines with direct network connection, make sure `ping <ip>` 
 We will use TensorFlow and Keras since it's currently the only supported strategy for
 [MultiWorkerMirroredStrategy](https://www.tensorflow.org/guide/distributed_training#types_of_strategies).
 
-```python
+```bash
 pip install --upgrade pip
 pip install -q tf-nightly --user
+pip install -q tfds-nightly --user
+```
+```python
 import tensorflow as tf; print(tf.__version__)
 ```
 ```
 2.2.0-dev20200410
+```
+```python
+import tensorflow_datasets as tfds; print(tfds.__version__)
+```
+```
+2.1.0
+```
+
+```python
+import tensorflow_datasets as tfds
+import tensorflow as tf
+tfds.disable_progress_bar()
 ```
 
 Adapted from [Multi-worker training with Keras
