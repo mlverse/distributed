@@ -243,3 +243,58 @@ Epoch 3/3
 
 Adapted from [Multi-worker training with Keras
 ](https://www.tensorflow.org/tutorials/distribute/multi_worker_with_keras).
+
+## R
+
+When using R, we will also make sure the workers are prooperly configured by training a local model first and installing all the required packages:
+
+```r
+install.packages("tenesorflow")
+install.packages("keras")
+install.packages("remotes")
+remotes::install_github("rstudio/tfds")
+```
+
+We can then define our model,
+
+```r
+library(keras)
+library(tfds)
+
+BUFFER_SIZE <- 10000
+BATCH_SIZE <- 64
+
+mnist <- tfds_load("mnist")
+
+train_dataset <- mnist$train %>% 
+  dataset_map(function(record) {
+    record$image <- tf$cast(record$image, tf$float32) / 255
+    record}) %>%
+  dataset_cache() %>%
+  dataset_shuffle(BUFFER_SIZE) %>% 
+  dataset_batch(BATCH_SIZE) %>% 
+  dataset_map(unname)
+  
+model <- keras_model_sequential() %>%
+  layer_conv_2d(
+    filters = 32,
+    kernel_size = 3,
+    activation = 'relu',
+    input_shape = c(28, 28, 1)
+  ) %>%
+  layer_max_pooling_2d() %>%
+  layer_flatten() %>%
+  layer_dense(units = 64, activation = 'relu') %>%
+  layer_dense(units = 10, activation = 'softmax')
+   
+model %>% compile(
+  loss = 'sparse_categorical_crossentropy',
+  optimizer = 'adam',
+  metrics = 'accuracy')
+```
+
+Then go ahead and train this local model,
+
+```r
+model %>% fit(train_dataset, epochs = 3)
+```
