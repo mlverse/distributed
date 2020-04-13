@@ -292,17 +292,17 @@ train_dataset <- mnist$train %>%
   dataset_batch(BATCH_SIZE) %>% 
   dataset_map(unname)
   
-model <- keras:::keras$models$Sequential()
-model$add(layer_conv_2d(
-    filters = 32,
-    kernel_size = 3,
-    activation = 'relu',
-    input_shape = c(28, 28, 1)
-))
-model$add(layer_max_pooling_2d())
-model$add(layer_flatten())
-model$add(layer_dense(units = 64, activation = 'relu'))
-model$add(layer_dense(units = 10, activation = 'softmax'))
+model <- keras_model_sequential(list(
+    layer_conv_2d(
+        filters = 32,
+        kernel_size = 3,
+        activation = 'relu',
+        input_shape = c(28, 28, 1)
+    ),
+    layer_max_pooling_2d(),
+    layer_flatten(),
+    layer_dense(units = 64, activation = 'relu'),
+    layer_dense(units = 10, activation = 'softmax')))
    
 model$compile(
   loss = 'sparse_categorical_crossentropy',
