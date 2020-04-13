@@ -281,7 +281,7 @@ library(tfds)
 BUFFER_SIZE <- 10000
 BATCH_SIZE <- 64
 
-mnist <- tfds_load("mnist", in_memory = TRUE)
+mnist <- tfds_load("mnist")
 
 train_dataset <- mnist$train %>% 
   dataset_map(function(record) {
