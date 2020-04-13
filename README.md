@@ -252,7 +252,8 @@ When using R, we will also make sure the workers are prooperly configured by tra
 install.packages("tenesorflow")
 install.packages("keras")
 install.packages("remotes")
-remotes::install_github("rstudio/tfds")
+remotes::install_github("rstudio/tfds", ref = "bugfix/in-memory-api")
+tfds::install_tfds()
 ```
 
 We can then define our model,
