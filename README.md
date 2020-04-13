@@ -247,14 +247,26 @@ Adapted from [Multi-worker training with Keras
 ## R
 
 ### Local
-When using R, we will also make sure the workers are prooperly configured by training a local model first and installing all the required packages:
+
+When using R, we will also make sure the workers are prooperly configured by training a local model first and installing all the required R packages:
 
 ```r
 install.packages("tenesorflow")
 install.packages("keras")
 install.packages("remotes")
 remotes::install_github("rstudio/tfds", ref = "bugfix/in-memory-api")
+```
+
+And the required runtime dependencies:
+
+```r
+tensorflow::install_tensorflow(version = "nightly")
 tfds::install_tfds()
+tensorflow::tf_version()
+```
+```
+Using virtual environment '~/.virtualenvs/r-reticulate' ...
+[1] ‘2.2’
 ```
 
 We can then define our model,
@@ -337,4 +349,50 @@ Sys.setenv(TF_CONFIG = jsonlite::toJSON(list(
     ),
     task = list(type = 'worker', index = 3)
 )))
+```
+
+We can now redefine out models using a MultiWorkerMirroredStrategy strategy as follows:
+
+```r
+library(tensorflow)
+library(keras)
+
+library(tfdatasets)
+library(tfds)
+
+BUFFER_SIZE <- 10000
+NUM_WORKERS <- 4
+BATCH_SIZE <- 64 * NUM_WORKERS
+
+mnist <- tfds_load("mnist")
+
+train_dataset <- mnist$train %>% 
+  dataset_map(function(record) {
+    record$image <- tf$cast(record$image, tf$float32) / 255
+    record}) %>%
+  dataset_cache() %>%
+  dataset_shuffle(BUFFER_SIZE) %>% 
+  dataset_batch(BATCH_SIZE) %>% 
+  dataset_map(unname)
+  
+strategy <- tf$distribute$MultiWorkerMirroredStrategy()
+
+with (strategy$scope(), {
+  model <- keras_model_sequential() %>%
+    layer_conv_2d(
+      filters = 32,
+      kernel_size = 3,
+      activation = 'relu',
+      input_shape = c(28, 28, 1)
+    ) %>%
+    layer_max_pooling_2d() %>%
+    layer_flatten() %>%
+    layer_dense(units = 64, activation = 'relu') %>%
+    layer_dense(units = 10, activation = 'softmax')
+   
+  model %>% compile(
+    loss = 'sparse_categorical_crossentropy',
+    optimizer = 'adam',
+    metrics = 'accuracy')
+})
 ```
