@@ -246,6 +246,7 @@ Adapted from [Multi-worker training with Keras
 
 ## R
 
+### Local
 When using R, we will also make sure the workers are prooperly configured by training a local model first and installing all the required packages:
 
 ```r
@@ -298,4 +299,42 @@ Then go ahead and train this local model,
 
 ```r
 model %>% fit(train_dataset, epochs = 3)
+```
+
+### Distributed
+
+Let's go now for distributed training, but first restart your R session, then define the cluster specification in each worker:
+
+```r
+# run in main worker
+Sys.setenv(TF_CONFIG = jsonlite::toJSON(list(
+    cluster = list(
+        worker = c("172.17.0.6:10090", "172.17.0.3:10088", "172.17.0.4:10087", "172.17.0.5:10089")
+    ),
+    task = list(type = 'worker', index = 0)
+)))
+
+# run in worker(1)
+Sys.setenv(TF_CONFIG = jsonlite::toJSON(list(
+    cluster = list(
+        worker = c("172.17.0.6:10090", "172.17.0.3:10088", "172.17.0.4:10087", "172.17.0.5:10089")
+    ),
+    task = list(type = 'worker', index = 1)
+)))
+
+# run in worker(2)
+Sys.setenv(TF_CONFIG = jsonlite::toJSON(list(
+    cluster = list(
+        worker = c("172.17.0.6:10090", "172.17.0.3:10088", "172.17.0.4:10087", "172.17.0.5:10089")
+    ),
+    task = list(type = 'worker', index = 2)
+)))
+
+# run in worker(3)
+Sys.setenv(TF_CONFIG = jsonlite::toJSON(list(
+    cluster = list(
+        worker = c("172.17.0.6:10090", "172.17.0.3:10088", "172.17.0.4:10087", "172.17.0.5:10089")
+    ),
+    task = list(type = 'worker', index = 3)
+)))
 ```
