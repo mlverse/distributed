@@ -272,13 +272,16 @@ Using virtual environment '~/.virtualenvs/r-reticulate' ...
 We can then define our model,
 
 ```r
+library(tensorflow)
 library(keras)
+
+library(tfdatasets)
 library(tfds)
 
 BUFFER_SIZE <- 10000
 BATCH_SIZE <- 64
 
-mnist <- tfds_load("mnist")
+mnist <- tfds_load("mnist", in_memory = TRUE)
 
 train_dataset <- mnist$train %>% 
   dataset_map(function(record) {
@@ -289,19 +292,19 @@ train_dataset <- mnist$train %>%
   dataset_batch(BATCH_SIZE) %>% 
   dataset_map(unname)
   
-model <- keras_model_sequential() %>%
-  layer_conv_2d(
+model <- keras:::keras$models$Sequential()
+model$add(layer_conv_2d(
     filters = 32,
     kernel_size = 3,
     activation = 'relu',
     input_shape = c(28, 28, 1)
-  ) %>%
-  layer_max_pooling_2d() %>%
-  layer_flatten() %>%
-  layer_dense(units = 64, activation = 'relu') %>%
-  layer_dense(units = 10, activation = 'softmax')
+))
+model$add(layer_max_pooling_2d())
+model$add(layer_flatten())
+model$add(layer_dense(units = 64, activation = 'relu'))
+model$add(layer_dense(units = 10, activation = 'softmax'))
    
-model %>% compile(
+model$compile(
   loss = 'sparse_categorical_crossentropy',
   optimizer = 'adam',
   metrics = 'accuracy')
@@ -310,7 +313,7 @@ model %>% compile(
 Then go ahead and train this local model,
 
 ```r
-model %>% fit(train_dataset, epochs = 3)
+model$fit(train_dataset, epochs = 3L)
 ```
 
 ### Distributed
