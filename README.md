@@ -273,6 +273,8 @@ Using virtual environment '~/.virtualenvs/r-reticulate' ...
 We can then define our model,
 
 ```r
+Sys.setenv(TF_CPP_MIN_LOG_LEVEL = 0)
+           
 library(tensorflow)
 library(keras)
 
@@ -282,27 +284,13 @@ library(tfds)
 BUFFER_SIZE <- 10000L
 BATCH_SIZE <- 64L
 
-mnist <- tfds_load("mnist")
+strategy <- tf$distribute$experimental$MultiWorkerMirroredStrategy()
 
-train_dataset <- mnist$train %>% 
-  dataset_map(function(record) {
-    record$image <- tf$cast(record$image, tf$float32) / 255
-    record}) %>%
-  dataset_cache() %>%
-  dataset_shuffle(BUFFER_SIZE) %>% 
-  dataset_batch(BATCH_SIZE) %>% 
-  dataset_map(unname)
+mnist <- dataset_mnist()
+x_train <- mnist$train$x
+x_train <- array_reshape(x_train, c(nrow(x_train), 28, 28, 1))
+x_train <- x_train / 255
 
-result <- tfds:::tfds$load(name = "mnist", with_info = TRUE, as_supervised = TRUE)
-datasets <- result[[1]]
-info <- result[[2]]
-
-train_dataset <- datasets$train$map(function(image, label) {
-        image <- tf$cast(image, tf$float32)
-        image <- image / 255
-        list(image, label)
-    })$cache()$shuffle(BUFFER_SIZE)$batch(BATCH_SIZE)
-  
 model <- keras_model_sequential() %>%
   layer_conv_2d(
     filters = 32,
@@ -316,7 +304,7 @@ model <- keras_model_sequential() %>%
     layer_dense(units = 10)
 
 model %>% compile(
-  loss = keras:::keras$losses$SparseCategoricalCrossentropy(from_logits=TRUE),
+  loss = keras:::keras$losses$SparseCategoricalCrossentropy(from_logits = TRUE),
   optimizer = keras:::keras$optimizers$SGD(learning_rate = 0.001),
   metrics = 'accuracy')
 ```
@@ -368,6 +356,8 @@ Sys.setenv(TF_CONFIG = jsonlite::toJSON(list(
 We can now redefine out models using a MultiWorkerMirroredStrategy strategy as follows:
 
 ```r
+Sys.setenv(TF_CPP_MIN_LOG_LEVEL = 0)
+           
 library(tensorflow)
 library(keras)
 
@@ -380,15 +370,10 @@ BATCH_SIZE <- 64L * NUM_WORKERS
 
 strategy <- tf$distribute$experimental$MultiWorkerMirroredStrategy()
 
-result <- tfds:::tfds$load(name = "mnist", with_info = TRUE, as_supervised = TRUE)
-datasets <- result[[1]]
-info <- result[[2]]
-
-train_dataset <- datasets$train$map(function(image, label) {
-        image <- tf$cast(image, tf$float32)
-        image <- image / 255
-        list(image, label)
-    })$cache()$shuffle(BUFFER_SIZE)$batch(BATCH_SIZE)
+mnist <- dataset_mnist()
+x_train <- mnist$train$x
+x_train <- array_reshape(x_train, c(nrow(x_train), 28, 28, 1))
+x_train <- x_train / 255
 
 with (strategy$scope(), {
   model <- keras_model_sequential() %>%
@@ -404,7 +389,7 @@ with (strategy$scope(), {
       layer_dense(units = 10)
 
   model %>% compile(
-    loss = keras:::keras$losses$SparseCategoricalCrossentropy(from_logits=TRUE),
+    loss = keras:::keras$losses$SparseCategoricalCrossentropy(from_logits = TRUE),
     optimizer = keras:::keras$optimizers$SGD(learning_rate = 0.001),
     metrics = 'accuracy')
 })
@@ -414,136 +399,4 @@ Finally, we can train across all workers by running over each of them,
 
 ```r
 model %>% fit(train_dataset, epochs = 3, steps_per_epoch = 5)
-```
-
-**Note:** Currently error when consuming dataset in master node followed by workers:
-
-```
-Error in py_call_impl(callable, dots$args, dots$keywords): InvalidArgumentError:  There aren't enough elements in this dataset for each shard to have at least one element (# elems = 1, # shards = 4). If you are using datasets with distribution strategy, considering setting the auto sharding policy to either DATA or OFF using the `experimental_distribute.auto_shard_policy` optionof `tf.data.Options()`.
-	 [[{{node MultiDeviceIteratorGetNextFromShard}}]]
-	 [[RemoteCall]]
-	 [[IteratorGetNext]] [Op:__inference_distributed_function_945]
-
-Function call stack:
-distributed_function
-
-
-Detailed traceback: 
-  File "/home/rstudio/.virtualenvs/r-reticulate/lib/python3.6/site-packages/tensorflow_core/python/keras/engine/training.py", line 819, in fit
-    use_multiprocessing=use_multiprocessing)
-  File "/home/rstudio/.virtualenvs/r-reticulate/lib/python3.6/site-packages/tensorflow_core/python/keras/engine/training_distributed.py", line 790, in fit
-    *args, **kwargs)
-  File "/home/rstudio/.virtualenvs/r-reticulate/lib/python3.6/site-packages/tensorflow_core/python/keras/engine/training_distributed.py", line 777, in wrapper
-    mode=dc.CoordinatorMode.INDEPENDENT_WORKER)
-  File "/home/rstudio/.virtualenvs/r-reticulate/lib/python3.6/site-packages/tensorflow_core/python/distribute/distribute_coordinator.py", line 853, in run_distribute_coordinator
-    task_id, session_config, rpc_layer)
-  File "/home/rstudio/.virtualenvs/r-reticulate/lib/python3.6/site-packages/tensorflow_core/python/distribute/distribute_coordinator.py", line 360, in _run_single_worker
-    return worker_fn(strategy)
-  File "/home/rstudio/.virtualenvs/r-reticulate/lib/python3.6/site-packages/tensorflow_core/python/keras/engine/training_distributed.py", line 772, in _worker_fn
-    return method(model, **kwargs)
-  File "/home/rstudio/.virtualenvs/r-reticulate/lib/python3.6/site-packages/tensorflow_core/python/keras/engine/training_v2.py", line 342, in fit
-    total_epochs=epochs)
-  File "/home/rstudio/.virtualenvs/r-reticulate/lib/python3.6/site-packages/tensorflow_core/python/keras/engine/training_v2.py", line 128, in run_one_epoch
-    batch_outs = execution_function(iterator)
-  File "/home/rstudio/.virtualenvs/r-reticulate/lib/python3.6/site-packages/tensorflow_core/python/keras/engine/training_v2_utils.py", line 98, in execution_function
-    distributed_function(input_fn))
-  File "/home/rstudio/.virtualenvs/r-reticulate/lib/python3.6/site-packages/tensorflow_core/python/eager/def_function.py", line 568, in __call__
-    result = self._call(*args, **kwds)
-  File "/home/rstudio/.virtualenvs/r-reticulate/lib/python3.6/site-packages/tensorflow_core/python/eager/def_function.py", line 632, in _call
-    return self._stateless_fn(*args, **kwds)
-  File "/home/rstudio/.virtualenvs/r-reticulate/lib/python3.6/site-packages/tensorflow_core/python/eager/function.py", line 2363, in __call__
-    return graph_function._filtered_call(args, kwargs)  # pylint: disable=protected-access
-  File "/home/rstudio/.virtualenvs/r-reticulate/lib/python3.6/site-packages/tensorflow_core/python/eager/function.py", line 1611, in _filtered_call
-    self.captured_inputs)
-  File "/home/rstudio/.virtualenvs/r-reticulate/lib/python3.6/site-packages/tensorflow_core/python/eager/function.py", line 1692, in _call_flat
-    ctx, args, cancellation_manager=cancellation_manager))
-  File "/home/rstudio/.virtualenvs/r-reticulate/lib/python3.6/site-packages/tensorflow_core/python/eager/function.py", line 545, in call
-    ctx=ctx)
-  File "/home/rstudio/.virtualenvs/r-reticulate/lib/python3.6/site-packages/tensorflow_core/python/eager/execute.py", line 67, in quick_execute
-    six.raise_from(core._status_to_exception(e.code, message), None)
-  File "<string>", line 3, in raise_from
-
-Traceback:
-
-1. model %>% fit(train_dataset, epochs = 3, steps_per_epoch = 5)
-2. withVisible(eval(quote(`_fseq`(`_lhs`)), env, env))
-3. eval(quote(`_fseq`(`_lhs`)), env, env)
-4. eval(quote(`_fseq`(`_lhs`)), env, env)
-5. `_fseq`(`_lhs`)
-6. freduce(value, `_function_list`)
-7. withVisible(function_list[[k]](value))
-8. function_list[[k]](value)
-9. fit(., train_dataset, epochs = 3, steps_per_epoch = 5)
-10. fit.keras.engine.training.Model(., train_dataset, epochs = 3, 
-  .     steps_per_epoch = 5)
-11. do.call(object$fit, args)
-12. (structure(function (...) 
-  . {
-  .     dots <- py_resolve_dots(list(...))
-  .     result <- py_call_impl(callable, dots$args, dots$keywords)
-  .     if (convert) 
-  .         result <- py_to_r(result)
-  .     if (is.null(result)) 
-  .         invisible(result)
-  .     else result
-  . }, class = c("python.builtin.method", "python.builtin.object"
-  . ), py_object = <environment>))(batch_size = NULL, epochs = 3L, 
-  .     verbose = 1L, callbacks = list(<environment>), validation_split = 0, 
-  .     shuffle = TRUE, class_weight = NULL, sample_weight = NULL, 
-  .     initial_epoch = 0L, x = <environment>, steps_per_epoch = 5L)
-13. py_call_impl(callable, dots$args, dots$keywords)
-```
-
-```
-Error in py_call_impl(callable, dots$args, dots$keywords): ValueError: Empty training data.
-
-Detailed traceback: 
-  File "/home/rstudio/.virtualenvs/r-reticulate/lib/python3.6/site-packages/tensorflow_core/python/keras/engine/training.py", line 819, in fit
-    use_multiprocessing=use_multiprocessing)
-  File "/home/rstudio/.virtualenvs/r-reticulate/lib/python3.6/site-packages/tensorflow_core/python/keras/engine/training_distributed.py", line 790, in fit
-    *args, **kwargs)
-  File "/home/rstudio/.virtualenvs/r-reticulate/lib/python3.6/site-packages/tensorflow_core/python/keras/engine/training_distributed.py", line 777, in wrapper
-    mode=dc.CoordinatorMode.INDEPENDENT_WORKER)
-  File "/home/rstudio/.virtualenvs/r-reticulate/lib/python3.6/site-packages/tensorflow_core/python/distribute/distribute_coordinator.py", line 853, in run_distribute_coordinator
-    task_id, session_config, rpc_layer)
-  File "/home/rstudio/.virtualenvs/r-reticulate/lib/python3.6/site-packages/tensorflow_core/python/distribute/distribute_coordinator.py", line 360, in _run_single_worker
-    return worker_fn(strategy)
-  File "/home/rstudio/.virtualenvs/r-reticulate/lib/python3.6/site-packages/tensorflow_core/python/keras/engine/training_distributed.py", line 772, in _worker_fn
-    return method(model, **kwargs)
-  File "/home/rstudio/.virtualenvs/r-reticulate/lib/python3.6/site-packages/tensorflow_core/python/keras/engine/training_v2.py", line 342, in fit
-    total_epochs=epochs)
-  File "/home/rstudio/.virtualenvs/r-reticulate/lib/python3.6/site-packages/tensorflow_core/python/keras/engine/training_v2.py", line 187, in run_one_epoch
-    aggregator.finalize()
-  File "/home/rstudio/.virtualenvs/r-reticulate/lib/python3.6/site-packages/tensorflow_core/python/keras/engine/training_utils.py", line 144, in finalize
-    raise ValueError('Empty training data.')
-
-Traceback:
-
-1. model %>% fit(train_dataset, epochs = 3, steps_per_epoch = 5)
-2. withVisible(eval(quote(`_fseq`(`_lhs`)), env, env))
-3. eval(quote(`_fseq`(`_lhs`)), env, env)
-4. eval(quote(`_fseq`(`_lhs`)), env, env)
-5. `_fseq`(`_lhs`)
-6. freduce(value, `_function_list`)
-7. withVisible(function_list[[k]](value))
-8. function_list[[k]](value)
-9. fit(., train_dataset, epochs = 3, steps_per_epoch = 5)
-10. fit.keras.engine.training.Model(., train_dataset, epochs = 3, 
-  .     steps_per_epoch = 5)
-11. do.call(object$fit, args)
-12. (structure(function (...) 
-  . {
-  .     dots <- py_resolve_dots(list(...))
-  .     result <- py_call_impl(callable, dots$args, dots$keywords)
-  .     if (convert) 
-  .         result <- py_to_r(result)
-  .     if (is.null(result)) 
-  .         invisible(result)
-  .     else result
-  . }, class = c("python.builtin.method", "python.builtin.object"
-  . ), py_object = <environment>))(batch_size = NULL, epochs = 3L, 
-  .     verbose = 1L, callbacks = list(<environment>), validation_split = 0, 
-  .     shuffle = TRUE, class_weight = NULL, sample_weight = NULL, 
-  .     initial_epoch = 0L, x = <environment>, steps_per_epoch = 5L)
-13. py_call_impl(callable, dots$args, dots$keywords)
 ```
