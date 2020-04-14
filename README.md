@@ -255,6 +255,7 @@ install.packages("tenesorflow")
 install.packages("keras")
 install.packages("remotes")
 remotes::install_github("rstudio/tfds", ref = "bugfix/in-memory-api")
+remotes::install_github("rstudio/keras", ref = "bugfix/chief-worker")
 ```
 
 And the required runtime dependencies:
@@ -364,7 +365,8 @@ library(tfdatasets)
 library(tfds)
 
 BUFFER_SIZE <- 10000
-BATCH_SIZE <- 64
+NUM_WORKERS <- 4
+BATCH_SIZE <- 64 * NUM_WORKERS
 
 strategy <- tf$distribute$experimental$MultiWorkerMirroredStrategy()
 
@@ -405,55 +407,14 @@ Finally, we can train across all workers by running over each of them,
 model %>% fit(train_dataset, epochs = 3)
 ```
 
-**Note:** Currently master node works properly but workers trigger:
+**Note:** Currently error when consuming dataset
 
 ```
-Error in py_call_impl(callable, dots$args, dots$keywords): AttributeError: 'RCallback' object has no attribute '_chief_worker_only'
+Error in py_call_impl(callable, dots$args, dots$keywords): InvalidArgumentError:  There aren't enough elements in this dataset for each shard to have at least one element (# elems = 1, # shards = 4). If you are using datasets with distribution strategy, considering setting the auto sharding policy to either DATA or OFF using the `experimental_distribute.auto_shard_policy` optionof `tf.data.Options()`.
+	 [[{{node MultiDeviceIteratorGetNextFromShard}}]]
+	 [[RemoteCall]]
+	 [[IteratorGetNext]] [Op:__inference_distributed_function_1126]
 
-Detailed traceback: 
-  File "/home/rstudio/.virtualenvs/r-reticulate/lib/python3.6/site-packages/tensorflow_core/python/keras/engine/training.py", line 819, in fit
-    use_multiprocessing=use_multiprocessing)
-  File "/home/rstudio/.virtualenvs/r-reticulate/lib/python3.6/site-packages/tensorflow_core/python/keras/engine/training_distributed.py", line 790, in fit
-    *args, **kwargs)
-  File "/home/rstudio/.virtualenvs/r-reticulate/lib/python3.6/site-packages/tensorflow_core/python/keras/engine/training_distributed.py", line 777, in wrapper
-    mode=dc.CoordinatorMode.INDEPENDENT_WORKER)
-  File "/home/rstudio/.virtualenvs/r-reticulate/lib/python3.6/site-packages/tensorflow_core/python/distribute/distribute_coordinator.py", line 853, in run_distribute_coordinator
-    task_id, session_config, rpc_layer)
-  File "/home/rstudio/.virtualenvs/r-reticulate/lib/python3.6/site-packages/tensorflow_core/python/distribute/distribute_coordinator.py", line 360, in _run_single_worker
-    return worker_fn(strategy)
-  File "/home/rstudio/.virtualenvs/r-reticulate/lib/python3.6/site-packages/tensorflow_core/python/keras/engine/training_distributed.py", line 770, in _worker_fn
-    callbacks, model)
-  File "/home/rstudio/.virtualenvs/r-reticulate/lib/python3.6/site-packages/tensorflow_core/python/keras/distribute/distributed_training_utils.py", line 1172, in filter_distributed_callbacks
-    callback for callback in callbacks_list if not callback._chief_worker_only
-  File "/home/rstudio/.virtualenvs/r-reticulate/lib/python3.6/site-packages/tensorflow_core/python/keras/distribute/distributed_training_utils.py", line 1172, in <listcomp>
-    callback for callback in callbacks_list if not callback._chief_worker_only
-
-Traceback:
-
-1. model %>% fit(train_dataset, epochs = 3)
-2. withVisible(eval(quote(`_fseq`(`_lhs`)), env, env))
-3. eval(quote(`_fseq`(`_lhs`)), env, env)
-4. eval(quote(`_fseq`(`_lhs`)), env, env)
-5. `_fseq`(`_lhs`)
-6. freduce(value, `_function_list`)
-7. withVisible(function_list[[k]](value))
-8. function_list[[k]](value)
-9. fit(., train_dataset, epochs = 3)
-10. fit.keras.engine.training.Model(., train_dataset, epochs = 3)
-11. do.call(object$fit, args)
-12. (structure(function (...) 
-  . {
-  .     dots <- py_resolve_dots(list(...))
-  .     result <- py_call_impl(callable, dots$args, dots$keywords)
-  .     if (convert) 
-  .         result <- py_to_r(result)
-  .     if (is.null(result)) 
-  .         invisible(result)
-  .     else result
-  . }, class = c("python.builtin.method", "python.builtin.object"
-  . ), py_object = <environment>))(batch_size = NULL, epochs = 3L, 
-  .     verbose = 1L, callbacks = list(<environment>), validation_split = 0, 
-  .     shuffle = TRUE, class_weight = NULL, sample_weight = NULL, 
-  .     initial_epoch = 0L, x = <environment>)
-13. py_call_impl(callable, dots$args, dots$keywords)
+Function call stack:
+distributed_function
 ```
