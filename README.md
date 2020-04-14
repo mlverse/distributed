@@ -292,19 +292,19 @@ train_dataset <- mnist$train %>%
   dataset_batch(BATCH_SIZE) %>% 
   dataset_map(unname)
   
-model <- keras_model_sequential(list(
-    layer_conv_2d(
-        filters = 32,
-        kernel_size = 3,
-        activation = 'relu',
-        input_shape = c(28, 28, 1)
-    ),
-    layer_max_pooling_2d(),
-    layer_flatten(),
-    layer_dense(units = 64, activation = 'relu'),
-    layer_dense(units = 10, activation = 'softmax')))
-   
-model$compile(
+model <- keras_model_sequential() %>%
+  layer_conv_2d(
+    filters = 32,
+    kernel_size = 3,
+    activation = 'relu',
+  input_shape = c(28, 28, 1)
+  ) %>%
+    layer_max_pooling_2d() %>%
+    layer_flatten() %>%
+    layer_dense(units = 64, activation = 'relu') %>%
+    layer_dense(units = 10, activation = 'softmax')
+
+model %>% compile(
   loss = 'sparse_categorical_crossentropy',
   optimizer = 'adam',
   metrics = 'accuracy')
@@ -313,7 +313,7 @@ model$compile(
 Then go ahead and train this local model,
 
 ```r
-model$fit(train_dataset, epochs = 3L)
+model %>% fit(train_dataset, epochs = 3)
 ```
 
 ### Distributed
@@ -327,7 +327,7 @@ Sys.setenv(TF_CONFIG = jsonlite::toJSON(list(
         worker = c("172.17.0.6:10090", "172.17.0.3:10088", "172.17.0.4:10087", "172.17.0.5:10089")
     ),
     task = list(type = 'worker', index = 0)
-)))
+), auto_unbox = TRUE))
 
 # run in worker(1)
 Sys.setenv(TF_CONFIG = jsonlite::toJSON(list(
@@ -335,7 +335,7 @@ Sys.setenv(TF_CONFIG = jsonlite::toJSON(list(
         worker = c("172.17.0.6:10090", "172.17.0.3:10088", "172.17.0.4:10087", "172.17.0.5:10089")
     ),
     task = list(type = 'worker', index = 1)
-)))
+), auto_unbox = TRUE))
 
 # run in worker(2)
 Sys.setenv(TF_CONFIG = jsonlite::toJSON(list(
@@ -343,7 +343,7 @@ Sys.setenv(TF_CONFIG = jsonlite::toJSON(list(
         worker = c("172.17.0.6:10090", "172.17.0.3:10088", "172.17.0.4:10087", "172.17.0.5:10089")
     ),
     task = list(type = 'worker', index = 2)
-)))
+), auto_unbox = TRUE))
 
 # run in worker(3)
 Sys.setenv(TF_CONFIG = jsonlite::toJSON(list(
@@ -351,7 +351,7 @@ Sys.setenv(TF_CONFIG = jsonlite::toJSON(list(
         worker = c("172.17.0.6:10090", "172.17.0.3:10088", "172.17.0.4:10087", "172.17.0.5:10089")
     ),
     task = list(type = 'worker', index = 3)
-)))
+), auto_unbox = TRUE))
 ```
 
 We can now redefine out models using a MultiWorkerMirroredStrategy strategy as follows:
@@ -364,8 +364,9 @@ library(tfdatasets)
 library(tfds)
 
 BUFFER_SIZE <- 10000
-NUM_WORKERS <- 4
-BATCH_SIZE <- 64 * NUM_WORKERS
+BATCH_SIZE <- 64
+
+strategy <- tf$distribute$experimental$MultiWorkerMirroredStrategy()
 
 mnist <- tfds_load("mnist")
 
@@ -377,8 +378,6 @@ train_dataset <- mnist$train %>%
   dataset_shuffle(BUFFER_SIZE) %>% 
   dataset_batch(BATCH_SIZE) %>% 
   dataset_map(unname)
-  
-strategy <- tf$distribute$MultiWorkerMirroredStrategy()
 
 with (strategy$scope(), {
   model <- keras_model_sequential() %>%
@@ -386,16 +385,75 @@ with (strategy$scope(), {
       filters = 32,
       kernel_size = 3,
       activation = 'relu',
-      input_shape = c(28, 28, 1)
+    input_shape = c(28, 28, 1)
     ) %>%
-    layer_max_pooling_2d() %>%
-    layer_flatten() %>%
-    layer_dense(units = 64, activation = 'relu') %>%
-    layer_dense(units = 10, activation = 'softmax')
-   
+      layer_max_pooling_2d() %>%
+      layer_flatten() %>%
+      layer_dense(units = 64, activation = 'relu') %>%
+      layer_dense(units = 10, activation = 'softmax')
+
   model %>% compile(
     loss = 'sparse_categorical_crossentropy',
     optimizer = 'adam',
     metrics = 'accuracy')
 })
+```
+
+Finally, we can train across all workers by running over each of them,
+
+```r
+model %>% fit(train_dataset, epochs = 3)
+```
+
+**Note:** Currently master node works properly but workers trigger:
+
+```
+Error in py_call_impl(callable, dots$args, dots$keywords): AttributeError: 'RCallback' object has no attribute '_chief_worker_only'
+
+Detailed traceback: 
+  File "/home/rstudio/.virtualenvs/r-reticulate/lib/python3.6/site-packages/tensorflow_core/python/keras/engine/training.py", line 819, in fit
+    use_multiprocessing=use_multiprocessing)
+  File "/home/rstudio/.virtualenvs/r-reticulate/lib/python3.6/site-packages/tensorflow_core/python/keras/engine/training_distributed.py", line 790, in fit
+    *args, **kwargs)
+  File "/home/rstudio/.virtualenvs/r-reticulate/lib/python3.6/site-packages/tensorflow_core/python/keras/engine/training_distributed.py", line 777, in wrapper
+    mode=dc.CoordinatorMode.INDEPENDENT_WORKER)
+  File "/home/rstudio/.virtualenvs/r-reticulate/lib/python3.6/site-packages/tensorflow_core/python/distribute/distribute_coordinator.py", line 853, in run_distribute_coordinator
+    task_id, session_config, rpc_layer)
+  File "/home/rstudio/.virtualenvs/r-reticulate/lib/python3.6/site-packages/tensorflow_core/python/distribute/distribute_coordinator.py", line 360, in _run_single_worker
+    return worker_fn(strategy)
+  File "/home/rstudio/.virtualenvs/r-reticulate/lib/python3.6/site-packages/tensorflow_core/python/keras/engine/training_distributed.py", line 770, in _worker_fn
+    callbacks, model)
+  File "/home/rstudio/.virtualenvs/r-reticulate/lib/python3.6/site-packages/tensorflow_core/python/keras/distribute/distributed_training_utils.py", line 1172, in filter_distributed_callbacks
+    callback for callback in callbacks_list if not callback._chief_worker_only
+  File "/home/rstudio/.virtualenvs/r-reticulate/lib/python3.6/site-packages/tensorflow_core/python/keras/distribute/distributed_training_utils.py", line 1172, in <listcomp>
+    callback for callback in callbacks_list if not callback._chief_worker_only
+
+Traceback:
+
+1. model %>% fit(train_dataset, epochs = 3)
+2. withVisible(eval(quote(`_fseq`(`_lhs`)), env, env))
+3. eval(quote(`_fseq`(`_lhs`)), env, env)
+4. eval(quote(`_fseq`(`_lhs`)), env, env)
+5. `_fseq`(`_lhs`)
+6. freduce(value, `_function_list`)
+7. withVisible(function_list[[k]](value))
+8. function_list[[k]](value)
+9. fit(., train_dataset, epochs = 3)
+10. fit.keras.engine.training.Model(., train_dataset, epochs = 3)
+11. do.call(object$fit, args)
+12. (structure(function (...) 
+  . {
+  .     dots <- py_resolve_dots(list(...))
+  .     result <- py_call_impl(callable, dots$args, dots$keywords)
+  .     if (convert) 
+  .         result <- py_to_r(result)
+  .     if (is.null(result)) 
+  .         invisible(result)
+  .     else result
+  . }, class = c("python.builtin.method", "python.builtin.object"
+  . ), py_object = <environment>))(batch_size = NULL, epochs = 3L, 
+  .     verbose = 1L, callbacks = list(<environment>), validation_split = 0, 
+  .     shuffle = TRUE, class_weight = NULL, sample_weight = NULL, 
+  .     initial_epoch = 0L, x = <environment>)
+13. py_call_impl(callable, dots$args, dots$keywords)
 ```
