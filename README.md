@@ -161,8 +161,8 @@ with (strategy$scope(), {
       layer_dense(units = 10)
 
   model %>% compile(
-    loss = keras:::keras$losses$SparseCategoricalCrossentropy(from_logits = TRUE),
-    optimizer = keras:::keras$optimizers$SGD(learning_rate = 0.001),
+    loss = 'categorical_crossentropy',
+    optimizer = 'sgd',
     metrics = 'accuracy')
 })
 ```
