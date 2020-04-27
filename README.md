@@ -119,6 +119,7 @@ Sys.setenv(TF_CONFIG = jsonlite::toJSON(list(
 We can now redefine out models using a MultiWorkerMirroredStrategy strategy as follows:
 
 ```r
+library(tensorflow)
 library(keras)
 
 num_workers <- 4L
