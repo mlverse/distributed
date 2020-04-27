@@ -9,6 +9,7 @@ THis README assumes you have access to four different machines connected to the 
 ```
 sudo yum update
 sudo amazon-linux-extras install R3.4
+sudo yum install python3
 
 wget https://s3.amazonaws.com/rstudio-ide-build/server/centos6/x86_64/rstudio-server-rhel-1.3.947-x86_64.rpm
 sudo yum install rstudio-server-rhel-1.3.947-x86_64.rpm
