@@ -42,21 +42,17 @@ Using virtual environment '~/.virtualenvs/r-reticulate' ...
 We can then define our model,
 
 ```r        
-library(tensorflow)
 library(keras)
 
-library(tfdatasets)
-library(tfds)
-
-BUFFER_SIZE <- 10000L
-BATCH_SIZE <- 64L
-
-strategy <- tf$distribute$experimental$MultiWorkerMirroredStrategy()
+batch_size <- 64L
 
 mnist <- dataset_mnist()
 x_train <- mnist$train$x
+y_train <- mnist$train$y
+
 x_train <- array_reshape(x_train, c(nrow(x_train), 28, 28, 1))
 x_train <- x_train / 255
+y_train <- to_categorical(y_train, 10)
 
 model <- keras_model_sequential() %>%
   layer_conv_2d(
@@ -71,15 +67,15 @@ model <- keras_model_sequential() %>%
     layer_dense(units = 10)
 
 model %>% compile(
-  loss = keras:::keras$losses$SparseCategoricalCrossentropy(from_logits = TRUE),
-  optimizer = keras:::keras$optimizers$SGD(learning_rate = 0.001),
+  loss = 'categorical_crossentropy',
+  optimizer = 'sgd',
   metrics = 'accuracy')
 ```
 
 Then go ahead and train this local model,
 
 ```r
-model %>% fit(train_dataset, epochs = 3, steps_per_epoch = 5)
+model %>% fit(x_train, y_train, batch_size = batch_size, epochs = 3, steps_per_epoch = 5)
 ```
 
 ### Distributed
@@ -123,24 +119,32 @@ Sys.setenv(TF_CONFIG = jsonlite::toJSON(list(
 We can now redefine out models using a MultiWorkerMirroredStrategy strategy as follows:
 
 ```r
-Sys.setenv(TF_CPP_MIN_LOG_LEVEL = 0)
-           
-library(tensorflow)
 library(keras)
 
-library(tfdatasets)
-library(tfds)
-
-BUFFER_SIZE <- 10000L
-NUM_WORKERS <- 4L
-BATCH_SIZE <- 64L * NUM_WORKERS
-
-strategy <- tf$distribute$experimental$MultiWorkerMirroredStrategy()
+num_workers <- 4L
+batch_size <- 64L * num_workers
 
 mnist <- dataset_mnist()
 x_train <- mnist$train$x
+y_train <- mnist$train$y
+
 x_train <- array_reshape(x_train, c(nrow(x_train), 28, 28, 1))
 x_train <- x_train / 255
+y_train <- to_categorical(y_train, 10)
+
+model <- keras_model_sequential() %>%
+  layer_conv_2d(
+    filters = 32,
+    kernel_size = 3,
+    activation = 'relu',
+  input_shape = c(28, 28, 1)
+  ) %>%
+    layer_max_pooling_2d() %>%
+    layer_flatten() %>%
+    layer_dense(units = 64, activation = 'relu') %>%
+    layer_dense(units = 10)
+
+strategy <- tf$distribute$experimental$MultiWorkerMirroredStrategy()
 
 with (strategy$scope(), {
   model <- keras_model_sequential() %>%
@@ -165,7 +169,7 @@ with (strategy$scope(), {
 Finally, we can train across all workers by running over each of them,
 
 ```r
-model %>% fit(train_dataset, epochs = 3, steps_per_epoch = 5)
+model %>% fit(x_train, y_train, batch_size = batch_size, epochs = 3, steps_per_epoch = 5)
 ```
 
 ## Python
