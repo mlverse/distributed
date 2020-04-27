@@ -27,8 +27,6 @@ When using R, we will also make sure the workers are prooperly configured by tra
 install.packages("tenesorflow")
 install.packages("keras")
 install.packages("remotes")
-remotes::install_github("rstudio/tfds", ref = "bugfix/in-memory-api")
-remotes::install_github("rstudio/keras", ref = "bugfix/chief-worker")
 ```
 
 And the required runtime dependencies:
