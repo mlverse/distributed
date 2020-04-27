@@ -26,7 +26,6 @@ When using R, we will also make sure the workers are prooperly configured by tra
 ```r
 install.packages("tenesorflow")
 install.packages("keras")
-install.packages("remotes")
 ```
 
 And the required runtime dependencies:
