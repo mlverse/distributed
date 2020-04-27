@@ -31,7 +31,7 @@ install.packages("keras")
 And the required runtime dependencies:
 
 ```r
-tensorflow::install_tensorflow()
+tensorflow::install_tensorflow(version = "2.1")
 tensorflow::tf_version()
 ```
 ```
