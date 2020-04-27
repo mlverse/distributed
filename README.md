@@ -133,18 +133,6 @@ x_train <- array_reshape(x_train, c(nrow(x_train), 28, 28, 1))
 x_train <- x_train / 255
 y_train <- to_categorical(y_train, 10)
 
-model <- keras_model_sequential() %>%
-  layer_conv_2d(
-    filters = 32,
-    kernel_size = 3,
-    activation = 'relu',
-  input_shape = c(28, 28, 1)
-  ) %>%
-    layer_max_pooling_2d() %>%
-    layer_flatten() %>%
-    layer_dense(units = 64, activation = 'relu') %>%
-    layer_dense(units = 10)
-
 strategy <- tf$distribute$experimental$MultiWorkerMirroredStrategy()
 
 with (strategy$scope(), {
