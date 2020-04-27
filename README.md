@@ -43,9 +43,7 @@ Using virtual environment '~/.virtualenvs/r-reticulate' ...
 
 We can then define our model,
 
-```r
-Sys.setenv(TF_CPP_MIN_LOG_LEVEL = 0)
-           
+```r        
 library(tensorflow)
 library(keras)
 
