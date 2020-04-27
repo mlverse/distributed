@@ -31,7 +31,7 @@ install.packages("keras")
 And the required runtime dependencies:
 
 ```r
-tensorflow::install_tensorflow(version = "2.1")
+tensorflow::install_tensorflow()
 tensorflow::tf_version()
 ```
 ```
@@ -120,6 +120,10 @@ We can now redefine out models using a MultiWorkerMirroredStrategy strategy as f
 
 ```r
 library(tensorflow)
+
+# load tensorflow before keras
+tensorflow::tf_version()
+
 library(keras)
 
 num_workers <- 4L
