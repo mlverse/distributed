@@ -10,8 +10,8 @@ THis README assumes you have access to four different machines connected to the 
 sudo yum update
 sudo amazon-linux-extras install R3.4
 
-wget https://download2.rstudio.org/server/centos6/x86_64/rstudio-server-rhel-1.2.5042-x86_64.rpm
-sudo yum install rstudio-server-rhel-1.2.5042-x86_64.rpm
+wget https://s3.amazonaws.com/rstudio-ide-build/server/centos6/x86_64/rstudio-server-rhel-1.3.947-x86_64.rpm
+sudo yum install rstudio-server-rhel-1.3.947-x86_64.rpm
 
 sudo useradd rstudio
 sudo passwd rstudio
