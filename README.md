@@ -24,14 +24,14 @@ sudo passwd rstudio
 When using R, we will also make sure the workers are prooperly configured by training a local model first and installing all the required R packages:
 
 ```r
-install.packages("tenesorflow")
+install.packages("tensorflow")
 install.packages("keras")
 ```
 
 And the required runtime dependencies:
 
 ```r
-tensorflow::install_tensorflow(version = "nightly")
+tensorflow::install_tensorflow()
 tensorflow::tf_version()
 ```
 ```
