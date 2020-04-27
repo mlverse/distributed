@@ -120,10 +120,6 @@ We can now redefine out models using a MultiWorkerMirroredStrategy strategy as f
 
 ```r
 library(tensorflow)
-
-# load tensorflow before keras
-tensorflow::tf_version()
-
 library(keras)
 
 num_workers <- 4L
@@ -139,6 +135,11 @@ y_train <- to_categorical(y_train, 10)
 
 strategy <- tf$distribute$experimental$MultiWorkerMirroredStrategy()
 
+```
+
+Now wait a few secocnds for server to initialize and then define the model and compile it within scope,
+
+```r
 with (strategy$scope(), {
   model <- keras_model_sequential() %>%
     layer_conv_2d(
