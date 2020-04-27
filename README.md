@@ -1,5 +1,179 @@
 # Distributed
 
+For now, just a README with resources on running TensorFlow with distributed resources using R, but Python code also provided for reference.
+
+## Prerequisiters
+
+THis README assumes you have access to four different machines connected to the same network. You can easily get 4 EC2 AMI machines and install R/RStudio as follows:
+
+```
+sudo yum update
+sudo amazon-linux-extras install R3.4
+
+wget https://download2.rstudio.org/server/centos6/x86_64/rstudio-server-rhel-1.2.5042-x86_64.rpm
+sudo yum install rstudio-server-rhel-1.2.5042-x86_64.rpm
+
+sudo useradd rstudio
+sudo passwd rstudio
+```
+
+## R
+
+### Local
+
+When using R, we will also make sure the workers are prooperly configured by training a local model first and installing all the required R packages:
+
+```r
+install.packages("tenesorflow")
+install.packages("keras")
+install.packages("remotes")
+remotes::install_github("rstudio/tfds", ref = "bugfix/in-memory-api")
+remotes::install_github("rstudio/keras", ref = "bugfix/chief-worker")
+```
+
+And the required runtime dependencies:
+
+```r
+tensorflow::install_tensorflow(version = "nightly")
+tfds::install_tfds()
+tensorflow::tf_version()
+```
+```
+Using virtual environment '~/.virtualenvs/r-reticulate' ...
+[1] ‘2.2’
+```
+
+We can then define our model,
+
+```r
+Sys.setenv(TF_CPP_MIN_LOG_LEVEL = 0)
+           
+library(tensorflow)
+library(keras)
+
+library(tfdatasets)
+library(tfds)
+
+BUFFER_SIZE <- 10000L
+BATCH_SIZE <- 64L
+
+strategy <- tf$distribute$experimental$MultiWorkerMirroredStrategy()
+
+mnist <- dataset_mnist()
+x_train <- mnist$train$x
+x_train <- array_reshape(x_train, c(nrow(x_train), 28, 28, 1))
+x_train <- x_train / 255
+
+model <- keras_model_sequential() %>%
+  layer_conv_2d(
+    filters = 32,
+    kernel_size = 3,
+    activation = 'relu',
+  input_shape = c(28, 28, 1)
+  ) %>%
+    layer_max_pooling_2d() %>%
+    layer_flatten() %>%
+    layer_dense(units = 64, activation = 'relu') %>%
+    layer_dense(units = 10)
+
+model %>% compile(
+  loss = keras:::keras$losses$SparseCategoricalCrossentropy(from_logits = TRUE),
+  optimizer = keras:::keras$optimizers$SGD(learning_rate = 0.001),
+  metrics = 'accuracy')
+```
+
+Then go ahead and train this local model,
+
+```r
+model %>% fit(train_dataset, epochs = 3, steps_per_epoch = 5)
+```
+
+### Distributed
+
+Let's go now for distributed training, but first restart your R session, then define the cluster specification in each worker:
+
+```r
+# run in main worker
+Sys.setenv(TF_CONFIG = jsonlite::toJSON(list(
+    cluster = list(
+        worker = c("172.17.0.6:10090", "172.17.0.3:10088", "172.17.0.4:10087", "172.17.0.5:10089")
+    ),
+    task = list(type = 'worker', index = 0)
+), auto_unbox = TRUE))
+
+# run in worker(1)
+Sys.setenv(TF_CONFIG = jsonlite::toJSON(list(
+    cluster = list(
+        worker = c("172.17.0.6:10090", "172.17.0.3:10088", "172.17.0.4:10087", "172.17.0.5:10089")
+    ),
+    task = list(type = 'worker', index = 1)
+), auto_unbox = TRUE))
+
+# run in worker(2)
+Sys.setenv(TF_CONFIG = jsonlite::toJSON(list(
+    cluster = list(
+        worker = c("172.17.0.6:10090", "172.17.0.3:10088", "172.17.0.4:10087", "172.17.0.5:10089")
+    ),
+    task = list(type = 'worker', index = 2)
+), auto_unbox = TRUE))
+
+# run in worker(3)
+Sys.setenv(TF_CONFIG = jsonlite::toJSON(list(
+    cluster = list(
+        worker = c("172.17.0.6:10090", "172.17.0.3:10088", "172.17.0.4:10087", "172.17.0.5:10089")
+    ),
+    task = list(type = 'worker', index = 3)
+), auto_unbox = TRUE))
+```
+
+We can now redefine out models using a MultiWorkerMirroredStrategy strategy as follows:
+
+```r
+Sys.setenv(TF_CPP_MIN_LOG_LEVEL = 0)
+           
+library(tensorflow)
+library(keras)
+
+library(tfdatasets)
+library(tfds)
+
+BUFFER_SIZE <- 10000L
+NUM_WORKERS <- 4L
+BATCH_SIZE <- 64L * NUM_WORKERS
+
+strategy <- tf$distribute$experimental$MultiWorkerMirroredStrategy()
+
+mnist <- dataset_mnist()
+x_train <- mnist$train$x
+x_train <- array_reshape(x_train, c(nrow(x_train), 28, 28, 1))
+x_train <- x_train / 255
+
+with (strategy$scope(), {
+  model <- keras_model_sequential() %>%
+    layer_conv_2d(
+      filters = 32,
+      kernel_size = 3,
+      activation = 'relu',
+    input_shape = c(28, 28, 1)
+    ) %>%
+      layer_max_pooling_2d() %>%
+      layer_flatten() %>%
+      layer_dense(units = 64, activation = 'relu') %>%
+      layer_dense(units = 10)
+
+  model %>% compile(
+    loss = keras:::keras$losses$SparseCategoricalCrossentropy(from_logits = TRUE),
+    optimizer = keras:::keras$optimizers$SGD(learning_rate = 0.001),
+    metrics = 'accuracy')
+})
+```
+
+Finally, we can train across all workers by running over each of them,
+
+```r
+model %>% fit(train_dataset, epochs = 3, steps_per_epoch = 5)
+```
+
 ## Python
 
 Prerequisites: 4 machines with direct network connection, make sure `ping <ip>` works across them.
@@ -244,159 +418,3 @@ Epoch 3/3
 Adapted from [Multi-worker training with Keras
 ](https://www.tensorflow.org/tutorials/distribute/multi_worker_with_keras).
 
-## R
-
-### Local
-
-When using R, we will also make sure the workers are prooperly configured by training a local model first and installing all the required R packages:
-
-```r
-install.packages("tenesorflow")
-install.packages("keras")
-install.packages("remotes")
-remotes::install_github("rstudio/tfds", ref = "bugfix/in-memory-api")
-remotes::install_github("rstudio/keras", ref = "bugfix/chief-worker")
-```
-
-And the required runtime dependencies:
-
-```r
-tensorflow::install_tensorflow(version = "nightly")
-tfds::install_tfds()
-tensorflow::tf_version()
-```
-```
-Using virtual environment '~/.virtualenvs/r-reticulate' ...
-[1] ‘2.2’
-```
-
-We can then define our model,
-
-```r
-Sys.setenv(TF_CPP_MIN_LOG_LEVEL = 0)
-           
-library(tensorflow)
-library(keras)
-
-library(tfdatasets)
-library(tfds)
-
-BUFFER_SIZE <- 10000L
-BATCH_SIZE <- 64L
-
-strategy <- tf$distribute$experimental$MultiWorkerMirroredStrategy()
-
-mnist <- dataset_mnist()
-x_train <- mnist$train$x
-x_train <- array_reshape(x_train, c(nrow(x_train), 28, 28, 1))
-x_train <- x_train / 255
-
-model <- keras_model_sequential() %>%
-  layer_conv_2d(
-    filters = 32,
-    kernel_size = 3,
-    activation = 'relu',
-  input_shape = c(28, 28, 1)
-  ) %>%
-    layer_max_pooling_2d() %>%
-    layer_flatten() %>%
-    layer_dense(units = 64, activation = 'relu') %>%
-    layer_dense(units = 10)
-
-model %>% compile(
-  loss = keras:::keras$losses$SparseCategoricalCrossentropy(from_logits = TRUE),
-  optimizer = keras:::keras$optimizers$SGD(learning_rate = 0.001),
-  metrics = 'accuracy')
-```
-
-Then go ahead and train this local model,
-
-```r
-model %>% fit(train_dataset, epochs = 3, steps_per_epoch = 5)
-```
-
-### Distributed
-
-Let's go now for distributed training, but first restart your R session, then define the cluster specification in each worker:
-
-```r
-# run in main worker
-Sys.setenv(TF_CONFIG = jsonlite::toJSON(list(
-    cluster = list(
-        worker = c("172.17.0.6:10090", "172.17.0.3:10088", "172.17.0.4:10087", "172.17.0.5:10089")
-    ),
-    task = list(type = 'worker', index = 0)
-), auto_unbox = TRUE))
-
-# run in worker(1)
-Sys.setenv(TF_CONFIG = jsonlite::toJSON(list(
-    cluster = list(
-        worker = c("172.17.0.6:10090", "172.17.0.3:10088", "172.17.0.4:10087", "172.17.0.5:10089")
-    ),
-    task = list(type = 'worker', index = 1)
-), auto_unbox = TRUE))
-
-# run in worker(2)
-Sys.setenv(TF_CONFIG = jsonlite::toJSON(list(
-    cluster = list(
-        worker = c("172.17.0.6:10090", "172.17.0.3:10088", "172.17.0.4:10087", "172.17.0.5:10089")
-    ),
-    task = list(type = 'worker', index = 2)
-), auto_unbox = TRUE))
-
-# run in worker(3)
-Sys.setenv(TF_CONFIG = jsonlite::toJSON(list(
-    cluster = list(
-        worker = c("172.17.0.6:10090", "172.17.0.3:10088", "172.17.0.4:10087", "172.17.0.5:10089")
-    ),
-    task = list(type = 'worker', index = 3)
-), auto_unbox = TRUE))
-```
-
-We can now redefine out models using a MultiWorkerMirroredStrategy strategy as follows:
-
-```r
-Sys.setenv(TF_CPP_MIN_LOG_LEVEL = 0)
-           
-library(tensorflow)
-library(keras)
-
-library(tfdatasets)
-library(tfds)
-
-BUFFER_SIZE <- 10000L
-NUM_WORKERS <- 4L
-BATCH_SIZE <- 64L * NUM_WORKERS
-
-strategy <- tf$distribute$experimental$MultiWorkerMirroredStrategy()
-
-mnist <- dataset_mnist()
-x_train <- mnist$train$x
-x_train <- array_reshape(x_train, c(nrow(x_train), 28, 28, 1))
-x_train <- x_train / 255
-
-with (strategy$scope(), {
-  model <- keras_model_sequential() %>%
-    layer_conv_2d(
-      filters = 32,
-      kernel_size = 3,
-      activation = 'relu',
-    input_shape = c(28, 28, 1)
-    ) %>%
-      layer_max_pooling_2d() %>%
-      layer_flatten() %>%
-      layer_dense(units = 64, activation = 'relu') %>%
-      layer_dense(units = 10)
-
-  model %>% compile(
-    loss = keras:::keras$losses$SparseCategoricalCrossentropy(from_logits = TRUE),
-    optimizer = keras:::keras$optimizers$SGD(learning_rate = 0.001),
-    metrics = 'accuracy')
-})
-```
-
-Finally, we can train across all workers by running over each of them,
-
-```r
-model %>% fit(train_dataset, epochs = 3, steps_per_epoch = 5)
-```
