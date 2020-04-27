@@ -86,7 +86,7 @@ Let's go now for distributed training, but first restart your R session, then de
 # run in main worker
 Sys.setenv(TF_CONFIG = jsonlite::toJSON(list(
     cluster = list(
-        worker = c("172.17.0.6:10090", "172.17.0.3:10088", "172.17.0.4:10087", "172.17.0.5:10089")
+        worker = c("172.31.11.122:10090", "172.31.10.143:10088", "172.31.4.119:10087", "172.31.4.116:10089")
     ),
     task = list(type = 'worker', index = 0)
 ), auto_unbox = TRUE))
@@ -94,7 +94,7 @@ Sys.setenv(TF_CONFIG = jsonlite::toJSON(list(
 # run in worker(1)
 Sys.setenv(TF_CONFIG = jsonlite::toJSON(list(
     cluster = list(
-        worker = c("172.17.0.6:10090", "172.17.0.3:10088", "172.17.0.4:10087", "172.17.0.5:10089")
+        worker = c("172.31.11.122:10090", "172.31.10.143:10088", "172.31.4.119:10087", "172.31.4.116:10089")
     ),
     task = list(type = 'worker', index = 1)
 ), auto_unbox = TRUE))
@@ -102,7 +102,7 @@ Sys.setenv(TF_CONFIG = jsonlite::toJSON(list(
 # run in worker(2)
 Sys.setenv(TF_CONFIG = jsonlite::toJSON(list(
     cluster = list(
-        worker = c("172.17.0.6:10090", "172.17.0.3:10088", "172.17.0.4:10087", "172.17.0.5:10089")
+        worker = c("172.31.11.122:10090", "172.31.10.143:10088", "172.31.4.119:10087", "172.31.4.116:10089")
     ),
     task = list(type = 'worker', index = 2)
 ), auto_unbox = TRUE))
@@ -110,7 +110,7 @@ Sys.setenv(TF_CONFIG = jsonlite::toJSON(list(
 # run in worker(3)
 Sys.setenv(TF_CONFIG = jsonlite::toJSON(list(
     cluster = list(
-        worker = c("172.17.0.6:10090", "172.17.0.3:10088", "172.17.0.4:10087", "172.17.0.5:10089")
+        worker = c("172.31.11.122:10090", "172.31.10.143:10088", "172.31.4.119:10087", "172.31.4.116:10089")
     ),
     task = list(type = 'worker', index = 3)
 ), auto_unbox = TRUE))
