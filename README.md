@@ -33,7 +33,6 @@ And the required runtime dependencies:
 
 ```r
 tensorflow::install_tensorflow(version = "nightly")
-tfds::install_tfds()
 tensorflow::tf_version()
 ```
 ```
