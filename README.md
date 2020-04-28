@@ -26,7 +26,8 @@ When using R, we will also make sure the workers are prooperly configured by tra
 
 ```r
 install.packages("tensorflow")
-install.packages("keras")
+install.packages("remotes")
+remotes::install_github("rstudio/keras")
 ```
 
 And the required runtime dependencies:
