@@ -37,7 +37,7 @@ tensorflow::tf_version()
 ```
 ```
 Using virtual environment '~/.virtualenvs/r-reticulate' ...
-[1] ‘2.2’
+[1] ‘2.0’
 ```
 
 We can then define and train our model,
