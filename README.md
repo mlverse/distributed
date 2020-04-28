@@ -2,7 +2,7 @@
 
 For now, just a README with resources on running TensorFlow with distributed resources using R, but Python code also provided for reference.
 
-## Prerequisiters
+## Prerequisites
 
 THis README assumes you have access to four different machines connected to the same network. You can easily get 4 EC2 AMI machines and install R/RStudio as follows:
 
@@ -40,9 +40,10 @@ Using virtual environment '~/.virtualenvs/r-reticulate' ...
 [1] ‘2.2’
 ```
 
-We can then define our model,
+We can then define and train our model,
 
 ```r        
+library(tensorflow)
 library(keras)
 
 batch_size <- 64L
@@ -53,7 +54,6 @@ y_train <- mnist$train$y
 
 x_train <- array_reshape(x_train, c(nrow(x_train), 28, 28, 1))
 x_train <- x_train / 255
-y_train <- to_categorical(y_train, 10)
 
 model <- keras_model_sequential() %>%
   layer_conv_2d(
@@ -68,14 +68,10 @@ model <- keras_model_sequential() %>%
     layer_dense(units = 10)
 
 model %>% compile(
-  loss = 'categorical_crossentropy',
-  optimizer = 'sgd',
+  loss = tf$keras$losses$SparseCategoricalCrossentropy(from_logits = TRUE),
+  optimizer = tf$keras$optimizers$SGD(learning_rate = 0.001),
   metrics = 'accuracy')
-```
 
-Then go ahead and train this local model,
-
-```r
 model %>% fit(x_train, y_train, batch_size = batch_size, epochs = 3, steps_per_epoch = 5)
 ```
 
@@ -123,6 +119,8 @@ We can now redefine out models using a MultiWorkerMirroredStrategy strategy as f
 library(tensorflow)
 library(keras)
 
+strategy <- tf$distribute$experimental$MultiWorkerMirroredStrategy()
+
 num_workers <- 4L
 batch_size <- 64L * num_workers
 
@@ -132,15 +130,7 @@ y_train <- mnist$train$y
 
 x_train <- array_reshape(x_train, c(nrow(x_train), 28, 28, 1))
 x_train <- x_train / 255
-y_train <- to_categorical(y_train, 10)
 
-strategy <- tf$distribute$experimental$MultiWorkerMirroredStrategy()
-
-```
-
-Now wait a few secocnds for server to initialize and then define the model and compile it within scope,
-
-```r
 with (strategy$scope(), {
   model <- keras_model_sequential() %>%
     layer_conv_2d(
@@ -155,15 +145,11 @@ with (strategy$scope(), {
       layer_dense(units = 10)
 
   model %>% compile(
-    loss = 'categorical_crossentropy',
-    optimizer = 'sgd',
+    loss = tf$keras$losses$SparseCategoricalCrossentropy(from_logits = TRUE),
+    optimizer = tf$keras$optimizers$SGD(learning_rate = 0.001),
     metrics = 'accuracy')
 })
-```
 
-Finally, we can train across all workers by running over each of them,
-
-```r
 model %>% fit(x_train, y_train, batch_size = batch_size, epochs = 3, steps_per_epoch = 5)
 ```
 
@@ -281,15 +267,6 @@ os.environ['TF_CONFIG'] = json.dumps({
 We can then define the `MultiWorkerMirroredStrategy` strategy across all workers,
 
 ```python
-import os
-import json
-os.environ['TF_CONFIG'] = json.dumps({
-    'cluster': {
-        'worker': ["172.17.0.3:10090", "172.17.0.4:10088", "172.17.0.5:10087", "172.17.0.6:10089"]
-    },
-    'task': {'type': 'worker', 'index': 0}
-})
-
 import tensorflow as tf
 strategy = tf.distribute.experimental.MultiWorkerMirroredStrategy()
 
