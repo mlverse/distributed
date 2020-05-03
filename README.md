@@ -154,6 +154,97 @@ with (strategy$scope(), {
 model %>% fit(x_train, y_train, batch_size = batch_size, epochs = 3, steps_per_epoch = 5)
 ```
 
+### Spark
+
+When using Apache Spark, first install the dependencies as follows in the driver node:
+
+```r
+install.packages("tensorflow")
+install.packages("remotes")
+
+remotes::install_github("rstudio/keras")
+remotes::install_github("sparklyr/sparklyr", ref = "bugfix/barrier-partitionid")
+```
+
+Then you can connect to Spark as usual using `spark_connet()`, followed by using `spark_apply()` with `barrier = TRUE`:
+
+```r
+library(sparklyr)
+sc <- spark_connect(master = "yarn", spark_home = "/usr/lib/spark/", config = list(spark.dynamicAllocation.enabled = FALSE, `sparklyr.shell.executor-cores` = 8, `sparklyr.shell.num-executors` = 3, sparklyr.apply.env.WORKON_HOME = "/tmp/.virtualenvs"))
+
+result <- sdf_len(sc, 3, repartition = 3) %>%
+  spark_apply(function(df, barrier) {
+    tryCatch({
+      library(tensorflow)
+      library(keras)
+      
+      Sys.setenv(TF_CONFIG = jsonlite::toJSON(list(
+        cluster = list(worker = barrier$address),
+        task = list(type = 'worker', index = barrier$partition)
+      ), auto_unbox = TRUE))
+      
+      if (is.null(tf_version())) install_tensorflow()
+      
+      strategy <- tf$distribute$experimental$MultiWorkerMirroredStrategy()
+      
+      num_workers <- 3L
+      batch_size <- 64L * num_workers
+      
+      mnist <- dataset_mnist()
+      x_train <- mnist$train$x
+      y_train <- mnist$train$y
+      
+      x_train <- array_reshape(x_train, c(nrow(x_train), 28, 28, 1))
+      x_train <- x_train / 255
+      
+      with (strategy$scope(), {
+        model <- keras_model_sequential() %>%
+          layer_conv_2d(
+            filters = 32,
+            kernel_size = 3,
+            activation = 'relu',
+            input_shape = c(28, 28, 1)
+          ) %>%
+          layer_max_pooling_2d() %>%
+          layer_flatten() %>%
+          layer_dense(units = 64, activation = 'relu') %>%
+          layer_dense(units = 10)
+        
+        model %>% compile(
+          loss = tf$keras$losses$SparseCategoricalCrossentropy(from_logits = TRUE),
+          optimizer = tf$keras$optimizers$SGD(learning_rate = 0.001),
+          metrics = 'accuracy')
+      })
+      
+      result <- model %>% fit(x_train, y_train, batch_size = batch_size, epochs = 3, steps_per_epoch = 5)
+      
+      as.character(max(result$metrics$accuracy))
+    }, error = function(e) e$message)
+  }, barrier = TRUE, columns = c(address = "character")) %>%
+  collect()
+```
+
+Currently,
+
+```r
+cat(result$address[1])
+```
+```
+UnknownError: Could not start gRPC server
+
+Detailed traceback: 
+  File "/mnt/tmp/.virtualenvs/r-reticulate/lib64/python3.6/site-packages/tensorflow_core/python/distribute/collective_all_reduce_strategy.py", line 90, in __init__
+    communication=communication))
+  File "/mnt/tmp/.virtualenvs/r-reticulate/lib64/python3.6/site-packages/tensorflow_core/python/distribute/collective_all_reduce_strategy.py", line 144, in __init__
+    self._initialize_strategy(cluster_resolver)
+  File "/mnt/tmp/.virtualenvs/r-reticulate/lib64/python3.6/site-packages/tensorflow_core/python/distribute/collective_all_reduce_strategy.py", line 150, in _initialize_strategy
+    self._initialize_multi_worker(cluster_resolver)
+  File "/mnt/tmp/.virtualenvs/r-reticulate/lib64/python3.6/site-packages/tensorflow_core/python/distribute/collective_all_reduce_strategy.py", line 266, in _initialize_multi_worker
+    context.context().ensure_initialized()
+  File "/mnt/tmp/.virtualenvs/r-reticulate/lib64/python3.6/site-packages/tensorflow_core/python/eager/context.py", line 505, in ensure_initialized
+    server_def_str)
+```
+
 ## Python
 
 Prerequisites: 4 machines with direct network connection, make sure `ping <ip>` works across them.
