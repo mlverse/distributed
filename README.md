@@ -179,7 +179,7 @@ result <- sdf_len(sc, 3, repartition = 3) %>%
       library(keras)
       
       Sys.setenv(TF_CONFIG = jsonlite::toJSON(list(
-        cluster = list(worker = barrier$address),
+        cluster = list(worker = paste(gsub(":[0-9]+$", "", barrier$address), 8000 + seq_along(barrier$address), sep = ":")),
         task = list(type = 'worker', index = barrier$partition)
       ), auto_unbox = TRUE))
       
@@ -220,29 +220,22 @@ result <- sdf_len(sc, 3, repartition = 3) %>%
       
       as.character(max(result$metrics$accuracy))
     }, error = function(e) e$message)
-  }, barrier = TRUE, columns = c(address = "character")) %>%
+  }, barrier = TRUE, columns = c(address = "character"), ) %>%
   collect()
 ```
 
 Currently,
 
 ```r
-cat(result$address[1])
+result
 ```
 ```
-UnknownError: Could not start gRPC server
-
-Detailed traceback: 
-  File "/mnt/tmp/.virtualenvs/r-reticulate/lib64/python3.6/site-packages/tensorflow_core/python/distribute/collective_all_reduce_strategy.py", line 90, in __init__
-    communication=communication))
-  File "/mnt/tmp/.virtualenvs/r-reticulate/lib64/python3.6/site-packages/tensorflow_core/python/distribute/collective_all_reduce_strategy.py", line 144, in __init__
-    self._initialize_strategy(cluster_resolver)
-  File "/mnt/tmp/.virtualenvs/r-reticulate/lib64/python3.6/site-packages/tensorflow_core/python/distribute/collective_all_reduce_strategy.py", line 150, in _initialize_strategy
-    self._initialize_multi_worker(cluster_resolver)
-  File "/mnt/tmp/.virtualenvs/r-reticulate/lib64/python3.6/site-packages/tensorflow_core/python/distribute/collective_all_reduce_strategy.py", line 266, in _initialize_multi_worker
-    context.context().ensure_initialized()
-  File "/mnt/tmp/.virtualenvs/r-reticulate/lib64/python3.6/site-packages/tensorflow_core/python/eager/context.py", line 505, in ensure_initialized
-    server_def_str)
+# A tibble: 3 x 1
+  address         
+  <chr>           
+1 0.11979166418314
+2 0.11979166418314
+3 0.11979166418314
 ```
 
 ## Python
