@@ -163,7 +163,7 @@ install.packages("tensorflow")
 install.packages("remotes")
 
 remotes::install_github("rstudio/keras")
-remotes::install_github("sparklyr/sparklyr", ref = "bugfix/barrier-partitionid")
+remotes::install_github("sparklyr/sparklyr")
 ```
 
 Then you can connect to Spark as usual using `spark_connet()`, followed by using `spark_apply()` with `barrier = TRUE`:
