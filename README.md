@@ -172,7 +172,7 @@ Then you can connect to Spark as usual using `spark_connet()`, followed by using
 library(sparklyr)
 sc <- spark_connect(master = "yarn", spark_home = "/usr/lib/spark/", config = list(spark.dynamicAllocation.enabled = FALSE, `sparklyr.shell.executor-cores` = 8, `sparklyr.shell.num-executors` = 3, sparklyr.apply.env.WORKON_HOME = "/tmp/.virtualenvs"))
 
-result <- sdf_len(sc, 3, repartition = 3) %>%
+sdf_len(sc, 3, repartition = 3) %>%
   spark_apply(function(df, barrier) {
     tryCatch({
       library(tensorflow)
@@ -223,12 +223,6 @@ result <- sdf_len(sc, 3, repartition = 3) %>%
   }, barrier = TRUE, columns = c(address = "character"), ) %>%
   collect()
 ```
-
-Currently,
-
-```r
-result
-```
 ```
 # A tibble: 3 x 1
   address         
@@ -236,6 +230,21 @@ result
 1 0.11979166418314
 2 0.11979166418314
 3 0.11979166418314
+```
+
+To retrieve the model, instead of returning accuracy or other metrics you can serialize the HDF5 file and retrieve it form one of the worker nodes as follows,
+
+```r
+model_file <- paste0("trained-", barrier$partition, ".hdf5")
+save_model_hdf5(model, model_file)
+
+if (barrier$partition == 0) base64enc::base64encode(model_file) else ""
+```
+
+Which you can then save in the driver node and use it later on to perform scoring, etc.
+
+```r
+write(base64enc::base64decode(result$address[1]), "model.hdf5")
 ```
 
 ## Python
