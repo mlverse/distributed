@@ -416,3 +416,8 @@ INFO:tensorflow:Collective batch_all_reduce: 1 all-reduces, num_workers = 4
  1280/60000 [..............................] - ETA: 9s - loss: 2.3091 - accuracy: 0.0719
 ```
 
+## Resources
+
+- [Introduction to Distributed Deep Learnring](https://www.youtube.com/watch?v=igk6BxcjklI&t=1s)
+- [Distributed Deep Learning with TensorFlow and R](https://www.youtube.com/watch?v=DQyLTlD1IBc)
+- [Deep Learning with Spark, TensorFlow and R](https://www.youtube.com/watch?v=Zm20P3ADa14&t=595s)
