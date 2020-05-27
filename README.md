@@ -22,7 +22,7 @@ sudo passwd rstudio
 
 ### Local
 
-When using R, we will also make sure the workers are prooperly configured by training a local model first and installing all the required R packages:
+When using R, we will also make sure the workers are properly configured by training a local model first and installing all the required R packages:
 
 ```r
 install.packages("tensorflow")
@@ -254,7 +254,7 @@ Prerequisites: 4 machines with direct network connection, make sure `ping <ip>` 
 We will use [TensorFlow](https://www.tensorflow.org) and Keras since it's currently the only supported strategy for
 [MultiWorkerMirroredStrategy](https://www.tensorflow.org/guide/distributed_training#types_of_strategies).
 
-First install depedencies and validate versions,
+First install dependencies and validate versions,
 
 ```bash
 pip install --upgrade pip
@@ -418,6 +418,6 @@ INFO:tensorflow:Collective batch_all_reduce: 1 all-reduces, num_workers = 4
 
 ## Resources
 
-- [Introduction to Distributed Deep Learnring](https://www.youtube.com/watch?v=igk6BxcjklI&t=1s)
+- [Introduction to Distributed Deep Learning](https://www.youtube.com/watch?v=igk6BxcjklI&t=1s)
 - [Distributed Deep Learning with TensorFlow and R](https://www.youtube.com/watch?v=DQyLTlD1IBc)
 - [Deep Learning with Spark, TensorFlow and R](https://www.youtube.com/watch?v=Zm20P3ADa14&t=595s)
