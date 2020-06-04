@@ -26,8 +26,7 @@ When using R, we will also make sure the workers are properly configured by trai
 
 ```r
 install.packages("tensorflow")
-install.packages("remotes")
-remotes::install_github("rstudio/keras")
+install.packages("keras")
 ```
 
 And the required runtime dependencies:
@@ -161,8 +160,8 @@ When using Apache Spark, first install the dependencies as follows in the driver
 ```r
 install.packages("tensorflow")
 install.packages("remotes")
+install.packages("keras")
 
-remotes::install_github("rstudio/keras")
 remotes::install_github("sparklyr/sparklyr")
 ```
 
